@@ -51,14 +51,39 @@ export async function POST(req: NextRequest) {
       createdAt: new Date(),
     })
 
-    const transcriptRes = await fetch("http://localhost:3000/api/transcribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ audioUrl: uploadResult.secure_url }),
-    })
+    const deepgramRes = await fetch(
+      `https://api.deepgram.com/v1/listen?language=en&smart_format=true&punctuate=true&diarize=true`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`,
+          "Content-Type": audio.type,
+        },
+        body: buffer,
+      }
+    )
 
-    if (transcriptRes.ok) {
-      const { rawText, speakerA, speakerB } = await transcriptRes.json()
+    if (deepgramRes.ok) {
+      const data = await deepgramRes.json()
+      const words = data?.results?.channels?.[0]?.alternatives?.[0]?.words || []
+      const transcriptText = data?.results?.channels?.[0]?.alternatives?.[0]?.transcript || ""
+
+      const speakerMap: Record<number, string[]> = {}
+      for (const word of words) {
+        const speaker = word.speaker ?? 0
+        const text = word.punctuated_word || word.word
+        if (!speakerMap[speaker]) speakerMap[speaker] = []
+        speakerMap[speaker].push(text)
+      }
+
+      const speakers = Object.entries(speakerMap)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([, w]) => w.join(" "))
+
+      const speakerA = speakers[0] || transcriptText
+      const speakerB = speakers[1] || ""
+      const rawText = `Counsellor: ${speakerA}${speakerB ? `\n\nClient: ${speakerB}` : ""}`
+
       await db.insert(transcripts).values({
         id: crypto.randomUUID(),
         sessionId,
@@ -67,6 +92,7 @@ export async function POST(req: NextRequest) {
         speakerB,
         createdAt: new Date(),
       })
+
       await db.update(sessions).set({ status: "completed" }).where(eq(sessions.id, sessionId))
     }
 
