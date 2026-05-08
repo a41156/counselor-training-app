@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
         method: "POST",
         headers: {
           Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`,
-          "Content-Type": audio.type,
+          "Content-Type": "audio/mp4",
         },
         body: buffer,
       }
@@ -66,6 +66,7 @@ export async function POST(req: NextRequest) {
     console.log("Deepgram response status:", deepgramRes.status)
     const data = await deepgramRes.json()
     console.log("Deepgram response data:", JSON.stringify(data).slice(0, 500))
+    console.log("Audio size:", buffer.length, "type:", audio.type)
 
     if (deepgramRes.ok && data?.results?.channels?.[0]?.alternatives?.[0]?.transcript) {
       const words = data?.results?.channels?.[0]?.alternatives?.[0]?.words || []
