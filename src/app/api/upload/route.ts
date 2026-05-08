@@ -63,8 +63,11 @@ export async function POST(req: NextRequest) {
       }
     )
 
-    if (deepgramRes.ok) {
-      const data = await deepgramRes.json()
+    console.log("Deepgram response status:", deepgramRes.status)
+    const data = await deepgramRes.json()
+    console.log("Deepgram response data:", JSON.stringify(data).slice(0, 500))
+
+    if (deepgramRes.ok && data?.results?.channels?.[0]?.alternatives?.[0]?.transcript) {
       const words = data?.results?.channels?.[0]?.alternatives?.[0]?.words || []
       const transcriptText = data?.results?.channels?.[0]?.alternatives?.[0]?.transcript || ""
 
