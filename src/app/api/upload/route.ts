@@ -67,7 +67,9 @@ export async function POST(req: NextRequest) {
 
     console.log("Deepgram status:", deepgramRes.status)
     const data = await deepgramRes.json()
-    console.log("Deepgram response:", JSON.stringify(data).slice(0, 500))
+    console.log("Deepgram response:", JSON.stringify(data).slice(0, 800))
+    console.log("paragraphs:", JSON.stringify(data?.results?.paragraphs)?.slice(0, 200))
+    console.log("utterances:", JSON.stringify(data?.results?.utterances)?.slice(0, 200))
 
     const words = data?.results?.channels?.[0]?.alternatives?.[0]?.words || []
     const paragraphs = data?.results?.paragraphs?.paragraphs || []
