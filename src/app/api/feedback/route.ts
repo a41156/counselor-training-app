@@ -1,8 +1,4 @@
-import { NextRequest } from "next/server"
-import { streamText } from "ai"
-import { minimax } from "vercel-minimax-ai-provider"
-
-const model = minimax("MiniMax-M2")
+import { NextRequest, NextResponse } from "next/server"
 
 const PEDAGOGICAL_LENSES = {
   student: `You are a clinical pedagogy expert providing feedback on a counseling role-play session.
@@ -16,19 +12,31 @@ Focus on:
 export async function POST(req: NextRequest) {
   const { transcript, role } = await req.json()
 
-  const result = await streamText({
-    model,
-    messages: [
-      {
-        role: "system",
-        content: PEDAGOGICAL_LENSES[role as keyof typeof PEDAGOGICAL_LENSES] || PEDAGOGICAL_LENSES.student,
-      },
-      {
-        role: "user",
-        content: `Provide pedagogical feedback on this counseling session transcript:\n\n${transcript}`,
-      },
-    ],
+  const systemPrompt = PEDAGOGICAL_LENSES[role as keyof typeof PEDAGOGICAL_LENSES] || PEDAGOGICAL_LENSES.student
+
+  const response = await fetch("https://api.minimax.chat/v1/text/chatcompletion_v2", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${process.env.MINIMAX_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: "abab6.5s-chat",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `Provide pedagogical feedback on this counseling session transcript:\n\n${transcript}` },
+      ],
+    }),
   })
 
-  return result.toTextStreamResponse()
+  if (!response.ok) {
+    const error = await response.text()
+    console.error("MiniMax error:", response.status, error)
+    return NextResponse.json({ error: "AI feedback failed" }, { status: 500 })
+  }
+
+  const data = await response.json()
+  const feedback = data.choices?.[0]?.messages?.[0]?.text || data.choices?.[0]?.message?.content || ""
+
+  return NextResponse.json({ feedback })
 }

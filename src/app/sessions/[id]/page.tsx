@@ -3,10 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Download, Mic, User } from "lucide-react"
-import { useChat } from "@ai-sdk/react"
-import { DefaultChatTransport } from "ai"
-import type { UIMessage, TextUIPart } from "ai"
+import { ArrowLeft, Download, Mic, User, Loader2 } from "lucide-react"
 
 interface Transcript {
   rawText: string
@@ -14,25 +11,13 @@ interface Transcript {
   speakerB: string
 }
 
-function getTextContent(message: UIMessage): string {
-  return message.parts
-    .filter((part): part is TextUIPart => part.type === "text")
-    .map(part => part.text)
-    .join("")
-}
-
-const feedbackTransport = new DefaultChatTransport({ api: "/api/feedback" })
-
 export default function SessionPage() {
   const params = useParams()
   const [session, setSession] = useState<{ id: string; title: string; audioUrl: string; status: string } | null>(null)
   const [transcript, setTranscript] = useState<Transcript | null>(null)
+  const [feedback, setFeedback] = useState<string>("")
   const [loading, setLoading] = useState(true)
-  const { messages, sendMessage, status } = useChat({
-    transport: feedbackTransport,
-  })
-
-  const isLoading = status === "streaming" || status === "submitted"
+  const [feedbackLoading, setFeedbackLoading] = useState(false)
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -46,17 +31,27 @@ export default function SessionPage() {
   }, [params.id])
 
   useEffect(() => {
-    if (transcript?.rawText && messages.length === 0) {
-      sendMessage({
-        text: `Provide pedagogical feedback on this counseling session transcript:\n\n${transcript.rawText}`,
+    if (transcript?.rawText && !feedback) {
+      setFeedbackLoading(true)
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript: transcript.rawText, role: "student" }),
       })
+        .then((res) => res.json())
+        .then((data) => {
+          setFeedback(data.feedback || data.error || "No feedback generated")
+          setFeedbackLoading(false)
+        })
+        .catch(() => {
+          setFeedback("Failed to generate feedback")
+          setFeedbackLoading(false)
+        })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transcript])
+  }, [transcript, feedback])
 
   const exportToWord = async () => {
     const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import("docx")
-    const assistantMessages = messages.filter(m => m.role === "assistant")
     const doc = new Document({
       sections: [
         {
@@ -86,11 +81,7 @@ export default function SessionPage() {
               text: "AI Feedback",
               heading: HeadingLevel.HEADING_2,
             }),
-            new Paragraph({
-              children: assistantMessages
-                .map((m: UIMessage) => new TextRun(getTextContent(m)))
-                .flat(),
-            }),
+            new Paragraph({ text: feedback }),
           ],
         },
       ],
@@ -193,21 +184,16 @@ export default function SessionPage() {
               <h2 className="font-semibold text-slate-900 dark:text-white">Pedagogical Lens</h2>
             </div>
             <div className="flex-1 overflow-auto p-6">
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                {messages.map((m: UIMessage) =>
-                  m.role === "assistant" ? (
-                    <div key={m.id} className="whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
-                      {getTextContent(m)}
-                    </div>
-                  ) : null
-                )}
-                {isLoading && (
-                  <div className="flex items-center gap-2 text-sm text-slate-500">
-                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-                    Generating feedback...
-                  </div>
-                )}
-              </div>
+              {feedbackLoading ? (
+                <div className="flex items-center gap-2 text-sm text-slate-500">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Generating feedback...
+                </div>
+              ) : (
+                <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
+                  {feedback || "No feedback available"}
+                </div>
+              )}
             </div>
           </div>
         </div>
