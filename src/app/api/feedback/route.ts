@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       Authorization: `Bearer ${process.env.MINIMAX_API_KEY}`,
     },
     body: JSON.stringify({
-      model: "MiniMax-Text-01",
+      model: "MiniMax-M2",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `Provide pedagogical feedback on this counseling session transcript:\n\n${transcript}` },
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   }
 
   const data = await response.json()
-  const feedback = data.choices?.[0]?.messages?.[0]?.text || data.choices?.[0]?.message?.content || ""
+  const feedback = data.choices?.[0]?.message?.content || ""
 
   return NextResponse.json({ feedback })
 }
