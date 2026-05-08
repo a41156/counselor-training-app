@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
       console.log("Speakers after join:", speakers.map(s => s.length + " chars"))
       speakerA = speakers[0] || ""
       speakerB = speakers[1] || ""
-      rawText = `Counsellor: ${speakerA}${speakerB ? `\n\nClient: ${speakerB}` : ""}`
+      rawText = speakerA + (speakerB ? "\n\n" + speakerB : "")
     } else if (words.length > 0) {
       const speakerMap: Record<number, string[]> = {}
       for (const word of words) {
@@ -121,11 +121,7 @@ export async function POST(req: NextRequest) {
         .map(([, w]) => w.join(" "))
       speakerA = speakers[0] || ""
       speakerB = speakers[1] || ""
-      rawText = `Counsellor: ${speakerA}${speakerB ? `\n\nClient: ${speakerB}` : ""}`
-    } else if (transcriptText) {
-      speakerA = transcriptText
-      speakerB = ""
-      rawText = `Counsellor: ${speakerA}`
+      rawText = speakerA + (speakerB ? "\n\n" + speakerB : "")
     }
 
     console.log("Speaker A length:", speakerA.length, "first 20 chars:", speakerA.substring(0, 20))
