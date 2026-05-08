@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
     const words = data?.results?.channels?.[0]?.alternatives?.[0]?.words || []
     const paragraphs = data?.results?.paragraphs?.paragraphs || []
     const utterances = data?.results?.utterances || []
+    const transcriptText = data?.results?.channels?.[0]?.alternatives?.[0]?.transcript || ""
 
     let speakerA = ""
     let speakerB = ""
@@ -116,7 +117,14 @@ export async function POST(req: NextRequest) {
       speakerA = speakers[0] || ""
       speakerB = speakers[1] || ""
       rawText = `Counsellor: ${speakerA}${speakerB ? `\n\nClient: ${speakerB}` : ""}`
+    } else if (transcriptText) {
+      speakerA = transcriptText
+      speakerB = ""
+      rawText = `Counsellor: ${speakerA}`
     }
+
+    console.log("Speaker A:", speakerA.slice(0, 50))
+    console.log("Speaker B:", speakerB.slice(0, 50))
 
     if (speakerA || speakerB) {
       await db.insert(transcripts).values({
