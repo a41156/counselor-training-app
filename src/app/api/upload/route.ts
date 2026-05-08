@@ -94,15 +94,18 @@ export async function POST(req: NextRequest) {
       speakerB = speakers[1] || ""
       rawText = `Counsellor: ${speakerA}${speakerB ? `\n\nClient: ${speakerB}` : ""}`
     } else if (utterances.length > 0) {
+      console.log("Processing utterances, count:", utterances.length)
       const speakerMap: Record<number, string[]> = {}
       for (const utt of utterances) {
         const speaker = utt.speaker ?? 0
         if (!speakerMap[speaker]) speakerMap[speaker] = []
-        speakerMap[speaker].push(utt.text)
+        speakerMap[speaker].push(utt.transcript || "")
       }
+      console.log("Speaker map keys:", Object.keys(speakerMap))
       const speakers = Object.entries(speakerMap)
         .sort(([a], [b]) => Number(a) - Number(b))
         .map(([, texts]) => texts.join(" "))
+      console.log("Speakers after join:", speakers.map(s => s.length + " chars"))
       speakerA = speakers[0] || ""
       speakerB = speakers[1] || ""
       rawText = `Counsellor: ${speakerA}${speakerB ? `\n\nClient: ${speakerB}` : ""}`
