@@ -65,13 +65,13 @@ export async function POST(req: NextRequest) {
 
     console.log("Deepgram response status:", deepgramRes.status)
     const data = await deepgramRes.json()
-    console.log("Deepgram response data:", JSON.stringify(data).slice(0, 500))
-    console.log("Audio size:", buffer.length, "type:", audio.type)
+    console.log("Deepgram results:", JSON.stringify(data.results))
+    console.log("Audio size:", buffer.length, "type sent:", audio.type)
 
-    if (deepgramRes.ok && data?.results?.channels?.[0]?.alternatives?.[0]?.transcript) {
-      const words = data?.results?.channels?.[0]?.alternatives?.[0]?.words || []
-      const transcriptText = data?.results?.channels?.[0]?.alternatives?.[0]?.transcript || ""
+    const transcriptText = data?.results?.channels?.[0]?.alternatives?.[0]?.transcript || ""
+    const words = data?.results?.channels?.[0]?.alternatives?.[0]?.words || []
 
+    if (transcriptText || words.length > 0) {
       const speakerMap: Record<number, string[]> = {}
       for (const word of words) {
         const speaker = word.speaker ?? 0
@@ -88,6 +88,8 @@ export async function POST(req: NextRequest) {
       const speakerB = speakers[1] || ""
       const rawText = `Counsellor: ${speakerA}${speakerB ? `\n\nClient: ${speakerB}` : ""}`
 
+      console.log("Saving transcript:", rawText.slice(0, 100))
+
       await db.insert(transcripts).values({
         id: crypto.randomUUID(),
         sessionId,
@@ -98,6 +100,8 @@ export async function POST(req: NextRequest) {
       })
 
       await db.update(sessions).set({ status: "completed" }).where(eq(sessions.id, sessionId))
+    } else {
+      console.log("No transcript generated - Deepgram returned empty")
     }
 
     return NextResponse.json({ sessionId })
