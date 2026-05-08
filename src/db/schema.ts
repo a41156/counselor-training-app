@@ -31,6 +31,8 @@ export const transcripts = pgTable("transcripts", {
   rawText: text("raw_text").notNull(),
   speakerA: text("speaker_a"),
   speakerB: text("speaker_b"),
+  utterances: text("utterances"),
+  speakerLabels: text("speaker_labels"),
   createdAt: timestamp("created_at").notNull(),
 })
 

@@ -3,12 +3,19 @@
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Download, Mic, User, Loader2 } from "lucide-react"
+import { ArrowLeft, Download, Mic, User, Check } from "lucide-react"
+
+interface Utterance {
+  start: number
+  end: number
+  transcript: string
+  speaker: number
+}
 
 interface Transcript {
   rawText: string
-  speakerA: string
-  speakerB: string
+  utterances: Utterance[]
+  speakerLabels: Record<number, string> | null
 }
 
 export default function SessionPage() {
@@ -18,13 +25,26 @@ export default function SessionPage() {
   const [feedback, setFeedback] = useState<string>("")
   const [loading, setLoading] = useState(true)
   const [feedbackLoading, setFeedbackLoading] = useState(false)
+  const [speakerLabels, setSpeakerLabels] = useState<Record<number, string>>({})
+  const [labelsConfirmed, setLabelsConfirmed] = useState(false)
 
   useEffect(() => {
     const fetchSession = async () => {
       const res = await fetch(`/api/sessions/${params.id}`)
       const data = await res.json()
       setSession(data.session)
-      setTranscript(data.transcript)
+      if (data.transcript) {
+        const utterances = data.transcript.utterances ? JSON.parse(data.transcript.utterances) : []
+        setTranscript({
+          rawText: data.transcript.rawText || "",
+          utterances,
+          speakerLabels: data.transcript.speakerLabels ? JSON.parse(data.transcript.speakerLabels) : null,
+        })
+        if (data.transcript.speakerLabels) {
+          setSpeakerLabels(JSON.parse(data.transcript.speakerLabels))
+          setLabelsConfirmed(true)
+        }
+      }
       setLoading(false)
     }
     fetchSession()
@@ -50,6 +70,23 @@ export default function SessionPage() {
     }
   }, [transcript, feedback])
 
+  const assignSpeakerLabel = (speakerNum: number, label: string) => {
+    setSpeakerLabels((prev) => ({ ...prev, [speakerNum]: label }))
+  }
+
+  const confirmLabels = async () => {
+    setLabelsConfirmed(true)
+    await fetch(`/api/sessions/${params.id}/labels`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ speakerLabels }),
+    })
+  }
+
+  const getSpeakerName = (speakerNum: number) => {
+    return speakerLabels[speakerNum] || `Speaker ${speakerNum}`
+  }
+
   const exportToWord = async () => {
     const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import("docx")
     const doc = new Document({
@@ -64,18 +101,14 @@ export default function SessionPage() {
               text: "Transcript",
               heading: HeadingLevel.HEADING_2,
             }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: "Counsellor: ", bold: true }),
-                new TextRun(transcript?.speakerA || ""),
-              ],
-            }),
-            new Paragraph({
-              children: [
-                new TextRun({ text: "Client: ", bold: true }),
-                new TextRun(transcript?.speakerB || ""),
-              ],
-            }),
+            ...transcript?.utterances.map((utt) =>
+              new Paragraph({
+                children: [
+                  new TextRun({ text: `${getSpeakerName(utt.speaker)}: `, bold: true }),
+                  new TextRun(utt.transcript),
+                ],
+              })
+            ) || [],
             new Paragraph({ text: "" }),
             new Paragraph({
               text: "AI Feedback",
@@ -142,37 +175,98 @@ export default function SessionPage() {
       </header>
 
       <main className="mx-auto max-w-7xl p-6">
-        <div className="grid h-[calc(100vh-12rem)] gap-6 lg:grid-cols-2">
+        {!labelsConfirmed && transcript?.utterances && transcript.utterances.length > 0 && (
+          <div className="mb-6 rounded-2xl border border-blue-200 bg-blue-50 p-6 dark:border-blue-800 dark:bg-blue-900/20">
+            <h3 className="mb-4 text-lg font-semibold text-blue-900 dark:text-blue-300">
+              Identify Speakers
+            </h3>
+            <p className="mb-4 text-sm text-blue-700 dark:text-blue-400">
+              Click to assign which speaker is the Counsellor and which is the Client:
+            </p>
+            <div className="flex gap-4">
+              {Object.keys(speakerLabels).length === 0 ? (
+                <>
+                  <button
+                    onClick={() => {
+                      assignSpeakerLabel(0, "Counsellor")
+                      assignSpeakerLabel(1, "Client")
+                    }}
+                    className="flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-white hover:bg-blue-600"
+                  >
+                    <User className="h-4 w-4" />
+                    Speaker 0 = Counsellor, Speaker 1 = Client
+                  </button>
+                  <button
+                    onClick={() => {
+                      assignSpeakerLabel(0, "Client")
+                      assignSpeakerLabel(1, "Counsellor")
+                    }}
+                    className="flex items-center gap-2 rounded-lg bg-slate-500 px-4 py-2 text-white hover:bg-slate-600"
+                  >
+                    <User className="h-4 w-4" />
+                    Speaker 0 = Client, Speaker 1 = Counsellor
+                  </button>
+                </>
+              ) : (
+                <div className="flex items-center gap-4">
+                  <span className="text-sm">
+                    Speaker 0: <strong>{speakerLabels[0] || "Not set"}</strong>
+                  </span>
+                  <span className="text-sm">
+                    Speaker 1: <strong>{speakerLabels[1] || "Not set"}</strong>
+                  </span>
+                  {speakerLabels[0] && speakerLabels[1] && (
+                    <button
+                      onClick={confirmLabels}
+                      className="flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-white hover:bg-green-600"
+                    >
+                      <Check className="h-4 w-4" />
+                      Confirm
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="grid h-[calc(100vh-16rem)] gap-6 lg:grid-cols-2">
           <div className="flex flex-col rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
             <div className="flex items-center gap-3 border-b border-slate-200 px-6 py-4 dark:border-slate-700">
               <Mic className="h-5 w-5 text-blue-500" />
               <h2 className="font-semibold text-slate-900 dark:text-white">Transcript</h2>
             </div>
             <div className="flex-1 overflow-auto p-6">
-              {!transcript ? (
+              {!transcript?.utterances || transcript.utterances.length === 0 ? (
                 <div className="flex h-full items-center justify-center">
                   <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
                 </div>
               ) : (
-                <div className="space-y-6">
-                  <div className="rounded-xl bg-blue-50 p-4 dark:bg-blue-900/20">
-                    <div className="mb-2 flex items-center gap-2">
-                      <User className="h-4 w-4 text-blue-600" />
-                      <span className="font-medium text-blue-900 dark:text-blue-300">
-                        Counsellor (Speaker A)
-                      </span>
+                <div className="space-y-4">
+                  {transcript.utterances.map((utt, i) => (
+                    <div
+                      key={i}
+                      className={`rounded-xl p-4 ${
+                        getSpeakerName(utt.speaker) === "Counsellor"
+                          ? "bg-blue-50 dark:bg-blue-900/20"
+                          : "bg-slate-50 dark:bg-slate-700/50"
+                      }`}
+                    >
+                      <div className="mb-1 flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        <span
+                          className={`text-sm font-medium ${
+                            getSpeakerName(utt.speaker) === "Counsellor"
+                              ? "text-blue-900 dark:text-blue-300"
+                              : "text-slate-900 dark:text-slate-300"
+                          }`}
+                        >
+                          {getSpeakerName(utt.speaker)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-700 dark:text-slate-300">{utt.transcript}</p>
                     </div>
-                    <p className="text-sm text-slate-700 dark:text-slate-300">{transcript.speakerA}</p>
-                  </div>
-                  <div className="rounded-xl bg-slate-50 p-4 dark:bg-slate-700/50">
-                    <div className="mb-2 flex items-center gap-2">
-                      <User className="h-4 w-4 text-slate-600" />
-                      <span className="font-medium text-slate-900 dark:text-slate-300">
-                        Client (Speaker B)
-                      </span>
-                    </div>
-                    <p className="text-sm text-slate-700 dark:text-slate-300">{transcript.speakerB}</p>
-                  </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -186,7 +280,7 @@ export default function SessionPage() {
             <div className="flex-1 overflow-auto p-6">
               {feedbackLoading ? (
                 <div className="flex items-center gap-2 text-sm text-slate-500">
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
                   Generating feedback...
                 </div>
               ) : (

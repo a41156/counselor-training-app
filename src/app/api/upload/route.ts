@@ -137,8 +137,8 @@ export async function POST(req: NextRequest) {
         id: crypto.randomUUID(),
         sessionId,
         rawText,
-        speakerA,
-        speakerB,
+        utterances: JSON.stringify(utterances),
+        speakerLabels: null,
         createdAt: new Date(),
       })
       await db.update(sessions).set({ status: "completed" }).where(eq(sessions.id, sessionId))
