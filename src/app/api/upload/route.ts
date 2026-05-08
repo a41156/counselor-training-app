@@ -52,12 +52,12 @@ export async function POST(req: NextRequest) {
     })
 
     const deepgramRes = await fetch(
-      `https://api.deepgram.com/v1/listen?smart_format=true&punctuate=true&diarize=true`,
+      `https://api.deepgram.com/v1/listen?smart_format=true&punctuate=true&diarize=true&model=nova-3`,
       {
         method: "POST",
         headers: {
           Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`,
-          "Content-Type": "audio/mp4",
+          "Content-Type": audio.type,
         },
         body: buffer,
       }
