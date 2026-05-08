@@ -123,8 +123,9 @@ export async function POST(req: NextRequest) {
       rawText = `Counsellor: ${speakerA}`
     }
 
-    console.log("Speaker A:", speakerA.slice(0, 50))
-    console.log("Speaker B:", speakerB.slice(0, 50))
+    console.log("Speaker A length:", speakerA.length, "first 20 chars:", speakerA.substring(0, 20))
+    console.log("Speaker B length:", speakerB.length)
+    console.log("rawText length:", rawText.length)
 
     if (speakerA || speakerB) {
       await db.insert(transcripts).values({
