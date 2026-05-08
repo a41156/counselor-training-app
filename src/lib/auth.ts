@@ -40,14 +40,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    async signIn({ user }) {
+    async signIn({ user, account }) {
       if (user.email) {
         const existingUser = await db.query.users.findFirst({
           where: eq(users.email, user.email),
         })
         if (!existingUser) {
           await db.insert(users).values({
-            id: crypto.randomUUID(),
+            id: account?.provider === "google" && user.id ? user.id : crypto.randomUUID(),
             email: user.email,
             name: user.name,
             image: user.image,
@@ -59,12 +59,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       return true
     },
     async session({ session, token }) {
-      if (session.user && token.sub) {
-        session.user.id = token.sub
+      if (session.user && session.user.email) {
         const dbUser = await db.query.users.findFirst({
-          where: eq(users.id, token.sub),
+          where: eq(users.email, session.user.email),
         })
-        session.user.role = (dbUser?.role || "student") as UserRole
+        if (dbUser) {
+          session.user.id = dbUser.id
+          session.user.role = (dbUser.role || "student") as UserRole
+        }
       }
       return session
     },
