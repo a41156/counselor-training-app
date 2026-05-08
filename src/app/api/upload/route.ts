@@ -32,15 +32,16 @@ export async function POST(req: NextRequest) {
   try {
     const arrayBuffer = await audio.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
+    const base64 = buffer.toString("base64")
+    const dataUri = `data:${audio.type};base64,${base64}`
 
-    const uploadResult = await cloudinary.uploader.upload(
-      `data:${audio.type};base64,${buffer.toString("base64")}`,
-      {
-        resource_type: "raw",
-        folder: "counselor-training",
-        timeout: 120000,
-      }
-    )
+    const uploadResult = await cloudinary.uploader.upload(dataUri, {
+      resource_type: "raw",
+      folder: "counselor-training",
+      timeout: 120000,
+    })
+
+    console.log("Uploaded to Cloudinary:", uploadResult.secure_url)
 
     const sessionId = crypto.randomUUID()
     await db.insert(sessions).values({
@@ -53,14 +54,14 @@ export async function POST(req: NextRequest) {
     })
 
     const deepgramRes = await fetch(
-      "https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&punctuate=true&diarize=true",
+      "https://api.deepgram.com/v1/listen?smart_format=true&language=zh-HK&model=nova-3",
       {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${process.env.DEEPGRAM_API_KEY}`,
-          "Content-Type": audio.type,
+          Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`,
+          "Content-Type": "application/json",
         },
-        body: buffer,
+        body: JSON.stringify({ url: uploadResult.secure_url }),
       }
     )
 
@@ -97,36 +98,6 @@ export async function POST(req: NextRequest) {
       })
 
       await db.update(sessions).set({ status: "completed" }).where(eq(sessions.id, sessionId))
-    } else {
-      console.log("No transcript - trying without diarize...")
-
-      const retryRes = await fetch(
-        "https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&punctuate=true",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${process.env.DEEPGRAM_API_KEY}`,
-            "Content-Type": audio.type,
-          },
-          body: buffer,
-        }
-      )
-
-      const retryData = await retryRes.json()
-      console.log("Retry response:", JSON.stringify(retryData).slice(0, 300))
-
-      const retryTranscript = retryData?.results?.channels?.[0]?.alternatives?.[0]?.transcript || ""
-      if (retryTranscript) {
-        await db.insert(transcripts).values({
-          id: crypto.randomUUID(),
-          sessionId,
-          rawText: `Counsellor: ${retryTranscript}`,
-          speakerA: retryTranscript,
-          speakerB: "",
-          createdAt: new Date(),
-        })
-        await db.update(sessions).set({ status: "completed" }).where(eq(sessions.id, sessionId))
-      }
     }
 
     return NextResponse.json({ sessionId })
