@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
     })
 
     const deepgramRes = await fetch(
-      "https://api.deepgram.com/v1/listen?smart_format=true&language=zh-HK&model=nova-3",
+      "https://api.deepgram.com/v1/listen?diarize=true&paragraphs=true&punctuate=true&smart_format=true&utt_split=0.7&utterances=true&language=zh-HK&model=nova-3",
       {
         method: "POST",
         headers: {
@@ -67,27 +67,58 @@ export async function POST(req: NextRequest) {
 
     console.log("Deepgram status:", deepgramRes.status)
     const data = await deepgramRes.json()
-    console.log("Deepgram response:", JSON.stringify(data).slice(0, 300))
+    console.log("Deepgram response:", JSON.stringify(data).slice(0, 500))
 
-    const transcriptText = data?.results?.channels?.[0]?.alternatives?.[0]?.transcript || ""
     const words = data?.results?.channels?.[0]?.alternatives?.[0]?.words || []
+    const paragraphs = data?.results?.paragraphs?.paragraphs || []
+    const utterances = data?.results?.utterances || []
 
-    if (transcriptText || words.length > 0) {
+    let speakerA = ""
+    let speakerB = ""
+    let rawText = ""
+
+    if (paragraphs.length > 0) {
+      const speakerMap: Record<number, string[]> = {}
+      for (const para of paragraphs) {
+        const speaker = para.speaker ?? 0
+        if (!speakerMap[speaker]) speakerMap[speaker] = []
+        speakerMap[speaker].push(para.text)
+      }
+      const speakers = Object.entries(speakerMap)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([, texts]) => texts.join(" "))
+      speakerA = speakers[0] || ""
+      speakerB = speakers[1] || ""
+      rawText = `Counsellor: ${speakerA}${speakerB ? `\n\nClient: ${speakerB}` : ""}`
+    } else if (utterances.length > 0) {
+      const speakerMap: Record<number, string[]> = {}
+      for (const utt of utterances) {
+        const speaker = utt.speaker ?? 0
+        if (!speakerMap[speaker]) speakerMap[speaker] = []
+        speakerMap[speaker].push(utt.text)
+      }
+      const speakers = Object.entries(speakerMap)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([, texts]) => texts.join(" "))
+      speakerA = speakers[0] || ""
+      speakerB = speakers[1] || ""
+      rawText = `Counsellor: ${speakerA}${speakerB ? `\n\nClient: ${speakerB}` : ""}`
+    } else if (words.length > 0) {
       const speakerMap: Record<number, string[]> = {}
       for (const word of words) {
         const speaker = word.speaker ?? 0
         if (!speakerMap[speaker]) speakerMap[speaker] = []
         speakerMap[speaker].push(word.punctuated_word || word.word)
       }
-
       const speakers = Object.entries(speakerMap)
         .sort(([a], [b]) => Number(a) - Number(b))
         .map(([, w]) => w.join(" "))
+      speakerA = speakers[0] || ""
+      speakerB = speakers[1] || ""
+      rawText = `Counsellor: ${speakerA}${speakerB ? `\n\nClient: ${speakerB}` : ""}`
+    }
 
-      const speakerA = speakers[0] || transcriptText
-      const speakerB = speakers[1] || ""
-      const rawText = `Counsellor: ${speakerA}${speakerB ? `\n\nClient: ${speakerB}` : ""}`
-
+    if (speakerA || speakerB) {
       await db.insert(transcripts).values({
         id: crypto.randomUUID(),
         sessionId,
@@ -96,7 +127,6 @@ export async function POST(req: NextRequest) {
         speakerB,
         createdAt: new Date(),
       })
-
       await db.update(sessions).set({ status: "completed" }).where(eq(sessions.id, sessionId))
     }
 
