@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
     })
 
     const deepgramRes = await fetch(
-      `https://api.deepgram.com/v1/listen?language=en&smart_format=true&punctuate=true&diarize=true`,
+      `https://api.deepgram.com/v1/listen?smart_format=true&punctuate=true&diarize=true`,
       {
         method: "POST",
         headers: {
