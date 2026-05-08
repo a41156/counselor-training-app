@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { v2 as cloudinary } from "cloudinary"
 import { db } from "@/db"
-import { sessions } from "@/db/schema"
+import { sessions, transcripts } from "@/db/schema"
+import { eq } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 
 cloudinary.config({
@@ -44,6 +45,34 @@ export async function POST(req: NextRequest) {
     status: "processing",
     createdAt: new Date(),
   })
+
+  try {
+    const transcriptRes = await fetch("http://localhost:3000/api/transcribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ audioUrl: uploadResult.secure_url }),
+    })
+
+    if (transcriptRes.ok) {
+      const { rawText, speakerA, speakerB } = await transcriptRes.json()
+
+      await db.insert(transcripts).values({
+        id: crypto.randomUUID(),
+        sessionId,
+        rawText,
+        speakerA,
+        speakerB,
+        createdAt: new Date(),
+      })
+
+      await db
+        .update(sessions)
+        .set({ status: "completed" })
+        .where(eq(sessions.id, sessionId))
+    }
+  } catch (error) {
+    console.error("Transcription error:", error)
+  }
 
   return NextResponse.json({ sessionId })
 }
