@@ -4,14 +4,15 @@ import { sessions, transcripts } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const session = await auth()
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
 
   const sessionData = await db.query.sessions.findFirst({
-    where: eq(sessions.id, params.id),
+    where: eq(sessions.id, id),
   })
 
   if (!sessionData) {
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 
   const transcriptData = await db.query.transcripts.findFirst({
-    where: eq(transcripts.sessionId, params.id),
+    where: eq(transcripts.sessionId, id),
   })
 
   return NextResponse.json({

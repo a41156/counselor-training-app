@@ -1,14 +1,12 @@
 import NextAuth from "next-auth"
 import Google from "next-auth/providers/google"
 import Credentials from "next-auth/providers/credentials"
-import { DrizzleAdapter } from "@auth/drizzle-adapter"
 import { db } from "@/db"
 import { users } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import type { UserRole } from "@/db/schema"
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  adapter: DrizzleAdapter(db),
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID,
@@ -31,7 +29,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             email: credentials.email as string,
             name: null,
             image: null,
-            role: "student",
+            role: "student" as const,
             createdAt: new Date(),
           }
           await db.insert(users).values(newUser)
@@ -42,11 +40,29 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     }),
   ],
   callbacks: {
-    async session({ session, user }) {
-      if (session.user) {
-        session.user.id = user.id
+    async signIn({ user }) {
+      if (user.email) {
+        const existingUser = await db.query.users.findFirst({
+          where: eq(users.email, user.email),
+        })
+        if (!existingUser) {
+          await db.insert(users).values({
+            id: crypto.randomUUID(),
+            email: user.email,
+            name: user.name,
+            image: user.image,
+            role: "student",
+            createdAt: new Date(),
+          })
+        }
+      }
+      return true
+    },
+    async session({ session, token }) {
+      if (session.user && token.sub) {
+        session.user.id = token.sub
         const dbUser = await db.query.users.findFirst({
-          where: eq(users.id, user.id),
+          where: eq(users.id, token.sub),
         })
         session.user.role = (dbUser?.role || "student") as UserRole
       }
@@ -59,4 +75,5 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   session: {
     strategy: "jwt",
   },
+  secret: process.env.AUTH_SECRET,
 })
