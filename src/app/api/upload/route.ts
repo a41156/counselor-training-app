@@ -5,8 +5,6 @@ import { sessions, transcripts } from "@/db/schema"
 import { eq } from "drizzle-orm"
 import { auth } from "@/lib/auth"
 
-import { v2 as cloudinary } from "cloudinary"
-
 if (process.env.CLOUDINARY_URL) {
   cloudinary.config(process.env.CLOUDINARY_URL)
 } else {
