@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
       Authorization: `Bearer ${process.env.MINIMAX_API_KEY}`,
     },
     body: JSON.stringify({
-      model: "abab6.5s-chat",
+      model: "MiniMax-Text-01",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: `Provide pedagogical feedback on this counseling session transcript:\n\n${transcript}` },
