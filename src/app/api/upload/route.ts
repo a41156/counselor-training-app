@@ -32,14 +32,15 @@ export async function POST(req: NextRequest) {
   try {
     const arrayBuffer = await audio.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
-    const base64 = buffer.toString("base64")
-    const dataUri = `data:${audio.type};base64,${base64}`
 
-    const uploadResult = await cloudinary.uploader.upload(dataUri, {
-      resource_type: "raw",
-      folder: "counselor-training",
-      timeout: 120000,
-    })
+    const uploadResult = await cloudinary.uploader.upload(
+      `data:${audio.type};base64,${buffer.toString("base64")}`,
+      {
+        resource_type: "raw",
+        folder: "counselor-training",
+        timeout: 120000,
+      }
+    )
 
     const sessionId = crypto.randomUUID()
     await db.insert(sessions).values({
@@ -52,21 +53,20 @@ export async function POST(req: NextRequest) {
     })
 
     const deepgramRes = await fetch(
-      `https://api.deepgram.com/v1/listen?smart_format=true&punctuate=true&diarize=true&model=nova-3`,
+      "https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&punctuate=true&diarize=true",
       {
         method: "POST",
         headers: {
-          Authorization: `Token ${process.env.DEEPGRAM_API_KEY}`,
+          Authorization: `Bearer ${process.env.DEEPGRAM_API_KEY}`,
           "Content-Type": audio.type,
         },
         body: buffer,
       }
     )
 
-    console.log("Deepgram response status:", deepgramRes.status)
+    console.log("Deepgram status:", deepgramRes.status)
     const data = await deepgramRes.json()
-    console.log("Deepgram results:", JSON.stringify(data.results))
-    console.log("Audio size:", buffer.length, "type sent:", audio.type)
+    console.log("Deepgram response:", JSON.stringify(data).slice(0, 300))
 
     const transcriptText = data?.results?.channels?.[0]?.alternatives?.[0]?.transcript || ""
     const words = data?.results?.channels?.[0]?.alternatives?.[0]?.words || []
@@ -75,9 +75,8 @@ export async function POST(req: NextRequest) {
       const speakerMap: Record<number, string[]> = {}
       for (const word of words) {
         const speaker = word.speaker ?? 0
-        const text = word.punctuated_word || word.word
         if (!speakerMap[speaker]) speakerMap[speaker] = []
-        speakerMap[speaker].push(text)
+        speakerMap[speaker].push(word.punctuated_word || word.word)
       }
 
       const speakers = Object.entries(speakerMap)
@@ -87,8 +86,6 @@ export async function POST(req: NextRequest) {
       const speakerA = speakers[0] || transcriptText
       const speakerB = speakers[1] || ""
       const rawText = `Counsellor: ${speakerA}${speakerB ? `\n\nClient: ${speakerB}` : ""}`
-
-      console.log("Saving transcript:", rawText.slice(0, 100))
 
       await db.insert(transcripts).values({
         id: crypto.randomUUID(),
@@ -101,7 +98,35 @@ export async function POST(req: NextRequest) {
 
       await db.update(sessions).set({ status: "completed" }).where(eq(sessions.id, sessionId))
     } else {
-      console.log("No transcript generated - Deepgram returned empty")
+      console.log("No transcript - trying without diarize...")
+
+      const retryRes = await fetch(
+        "https://api.deepgram.com/v1/listen?model=nova-3&smart_format=true&punctuate=true",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.DEEPGRAM_API_KEY}`,
+            "Content-Type": audio.type,
+          },
+          body: buffer,
+        }
+      )
+
+      const retryData = await retryRes.json()
+      console.log("Retry response:", JSON.stringify(retryData).slice(0, 300))
+
+      const retryTranscript = retryData?.results?.channels?.[0]?.alternatives?.[0]?.transcript || ""
+      if (retryTranscript) {
+        await db.insert(transcripts).values({
+          id: crypto.randomUUID(),
+          sessionId,
+          rawText: `Counsellor: ${retryTranscript}`,
+          speakerA: retryTranscript,
+          speakerB: "",
+          createdAt: new Date(),
+        })
+        await db.update(sessions).set({ status: "completed" }).where(eq(sessions.id, sessionId))
+      }
     }
 
     return NextResponse.json({ sessionId })

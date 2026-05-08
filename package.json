@@ -11,6 +11,7 @@
   "dependencies": {
     "@ai-sdk/react": "^3.0.178",
     "@auth/drizzle-adapter": "^1.11.2",
+    "@deepgram/sdk": "^5.1.0",
     "@neondatabase/serverless": "^1.1.0",
     "ai": "^6.0.176",
     "cloudinary": "^2.10.0",
