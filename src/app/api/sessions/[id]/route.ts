@@ -23,6 +23,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     where: eq(transcripts.sessionId, id),
   })
 
+  console.log("Session API - transcript:", JSON.stringify(transcriptData)?.slice(0, 300))
+
   return NextResponse.json({
     session: sessionData,
     transcript: transcriptData,
