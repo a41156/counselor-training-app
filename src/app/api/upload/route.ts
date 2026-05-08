@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
     const dataUri = `data:${audio.type};base64,${base64}`
 
     const uploadResult = await cloudinary.uploader.upload(dataUri, {
-      resource_type: "auto",
+      resource_type: "raw",
       folder: "counselor-training",
       timeout: 120000,
     })
