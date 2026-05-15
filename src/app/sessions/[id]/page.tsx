@@ -25,6 +25,7 @@ export default function SessionPage() {
   const [feedback, setFeedback] = useState<string>("")
   const [loading, setLoading] = useState(true)
   const [feedbackLoading, setFeedbackLoading] = useState(false)
+  const [feedbackLoaded, setFeedbackLoaded] = useState(false)
   const [speakerLabels, setSpeakerLabels] = useState<Record<number, string>>({})
   const [labelsConfirmed, setLabelsConfirmed] = useState(false)
   const [feedbackLanguage, setFeedbackLanguage] = useState("traditional-chinese")
@@ -62,12 +63,16 @@ export default function SessionPage() {
       })
         .then((res) => res.json())
         .then((data) => {
+          console.log("Feedback API response:", JSON.stringify(data).slice(0, 200))
           setFeedback(data.feedback || data.error || "No feedback generated")
           setFeedbackLoading(false)
+          setFeedbackLoaded(true)
         })
-        .catch(() => {
+        .catch((err) => {
+          console.error("Feedback API error:", err)
           setFeedback("Failed to generate feedback")
           setFeedbackLoading(false)
+          setFeedbackLoaded(true)
         })
     }
   }, [transcript, feedback, feedbackLanguage])
@@ -325,6 +330,8 @@ export default function SessionPage() {
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
                   Generating feedback...
                 </div>
+              ) : feedbackLoaded && !feedback ? (
+                <div className="text-sm text-slate-500">Failed to generate feedback</div>
               ) : (
                 <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300">
                   {feedback || "No feedback available"}
