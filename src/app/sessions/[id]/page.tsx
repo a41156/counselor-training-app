@@ -288,11 +288,9 @@ export default function SessionPage() {
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
                   Generating feedback...
                 </div>
-              ) : feedbackLoaded && !feedback ? (
-                <div className="text-sm text-slate-500">Failed to generate feedback</div>
               ) : (
                 <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-                  {feedback || "No feedback available"}
+                  {feedback}
                 </div>
               )}
             </div>
