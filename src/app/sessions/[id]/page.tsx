@@ -289,8 +289,16 @@ export default function SessionPage() {
                   Generating feedback...
                 </div>
               ) : (
-                <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300">
-                  {feedback}
+                <div
+                  className="text-sm leading-relaxed text-slate-700 dark:text-slate-300"
+                  style={{ whiteSpace: "pre-wrap" }}
+                >
+                  {feedback
+                    .replace(/^#+\s+/gm, "")
+                    .replace(/\*\*(.+?)\*\*/g, "$1")
+                    .replace(/\*(.+?)\*/g, "$1")
+                    .replace(/^-\s+/gm, "• ")
+                    .replace(/^(\d+)\.\s+/gm, "$1. ")}
                 </div>
               )}
             </div>
