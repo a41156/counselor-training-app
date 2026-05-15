@@ -26,6 +26,7 @@ export default function SessionPage() {
   const [loading, setLoading] = useState(true)
   const [feedbackLoading, setFeedbackLoading] = useState(false)
   const [feedbackLoaded, setFeedbackLoaded] = useState(false)
+  const [feedbackLanguage, setFeedbackLanguage] = useState("traditional-chinese")
   const [speakerLabels, setSpeakerLabels] = useState<Record<number, string>>({})
   const [labelsConfirmed, setLabelsConfirmed] = useState(false)
 
@@ -57,7 +58,7 @@ export default function SessionPage() {
       fetch("/api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transcript: transcript.rawText, role: "student" }),
+        body: JSON.stringify({ transcript: transcript.rawText, role: "student", language: feedbackLanguage }),
       })
         .then((res) => res.json())
         .then((data) => {
@@ -278,9 +279,49 @@ export default function SessionPage() {
           </div>
 
           <div className="flex flex-col rounded-2xl border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
-            <div className="flex items-center gap-3 border-b border-slate-200 px-6 py-4 dark:border-slate-700">
-              <div className="h-5 w-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600" />
-              <h2 className="font-semibold text-slate-900 dark:text-white">Pedagogical Lens</h2>
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-700">
+              <div className="flex items-center gap-3">
+                <div className="h-5 w-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600" />
+                <h2 className="font-semibold text-slate-900 dark:text-white">Pedagogical Lens</h2>
+              </div>
+              <div className="flex items-center gap-3">
+                <select
+                  value={feedbackLanguage}
+                  onChange={(e) => setFeedbackLanguage(e.target.value)}
+                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-800"
+                >
+                  <option value="traditional-chinese">繁體中文</option>
+                  <option value="simplified-chinese">簡體中文</option>
+                  <option value="english">English</option>
+                </select>
+                <button
+                  onClick={() => {
+                    setFeedback("")
+                    setFeedbackLoaded(false)
+                    setFeedbackLoading(true)
+                    fetch("/api/feedback", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ transcript: transcript?.rawText, role: "student", language: feedbackLanguage }),
+                    })
+                      .then((res) => res.json())
+                      .then((data) => {
+                        setFeedback(data.feedback || data.error || "No feedback generated")
+                        setFeedbackLoading(false)
+                        setFeedbackLoaded(true)
+                      })
+                      .catch(() => {
+                        setFeedback("Failed to generate feedback")
+                        setFeedbackLoading(false)
+                        setFeedbackLoaded(true)
+                      })
+                  }}
+                  disabled={feedbackLoading || !transcript?.rawText}
+                  className="rounded-lg bg-blue-500 px-3 py-1.5 text-sm text-white hover:bg-blue-600 disabled:opacity-50"
+                >
+                  Regenerate
+                </button>
+              </div>
             </div>
             <div className="flex-1 overflow-auto p-6">
               {feedbackLoading ? (

@@ -10,9 +10,15 @@ Focus on:
 }
 
 export async function POST(req: NextRequest) {
-  const { transcript, role } = await req.json()
+  const { transcript, role, language } = await req.json()
 
   const systemPrompt = PEDAGOGICAL_LENSES[role as keyof typeof PEDAGOGICAL_LENSES] || PEDAGOGICAL_LENSES.student
+
+  const languageInstruction = language === "simplified-chinese"
+    ? "Please respond in Simplified Chinese (簡體中文)."
+    : language === "english"
+    ? "Please respond in English."
+    : "Please respond in Traditional Chinese (繁體中文)."
 
   const response = await fetch("https://api.minimax.chat/v1/text/chatcompletion_v2", {
     method: "POST",
@@ -24,7 +30,7 @@ export async function POST(req: NextRequest) {
       model: "MiniMax-M2.7",
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `Provide pedagogical feedback on this counseling session transcript:\n\n${transcript}` },
+        { role: "user", content: `${languageInstruction}\n\nProvide pedagogical feedback on this counseling session transcript:\n\n${transcript}` },
       ],
     }),
   })
