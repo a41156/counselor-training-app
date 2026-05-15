@@ -326,7 +326,7 @@ export default function SessionPage() {
                   Generating feedback...
                 </div>
               ) : (
-                <div className="prose prose-sm dark:prose-invert max-w-none whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
+                <div className="whitespace-pre-wrap text-sm leading-relaxed text-slate-700 dark:text-slate-300">
                   {feedback || "No feedback available"}
                 </div>
               )}
