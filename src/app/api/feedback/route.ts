@@ -42,7 +42,8 @@ export async function POST(req: NextRequest) {
   }
 
   const data = await response.json()
-  const feedback = data.choices?.[0]?.message?.content || ""
+  console.log("MiniMax feedback response:", JSON.stringify(data).slice(0, 300))
+  const feedback = data.choices?.[0]?.message?.content || data.error || "No feedback generated"
 
   return NextResponse.json({ feedback })
 }
